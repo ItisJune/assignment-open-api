@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Time API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        .time-display {
+            font-size: 2em;
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .info-item {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .refresh-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .refresh-btn:hover {
+            background-color: #1557b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>World Time API</h1>
+        <select id="timezone-select">
+            <option value="Europe/London">Loading timezones...</option>
+        </select>
+        <div class="time-display" id="time">Loading...</div>
+        <div class="info">
+            <div class="info-item">
+                <strong>Timezone:</strong>
+                <div id="timezone">-</div>
+            </div>
+            <div class="info-item">
+                <strong>Day of Week:</strong>
+                <div id="day">-</div>
+            </div>
+            <div class="info-item">
+                <strong>UTC Offset:</strong>
+                <div id="offset">-</div>
+            </div>
+        </div>
+        <button class="refresh-btn" onclick="getCurrentTime()">Refresh Time</button>
+    </div>
+
+    <script>
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        let currentTimezone = 'Europe/London';
+        
+        async function getTimezones() {
+            try {
+                const response = await fetch('/time/timezones');
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+                
+                const select = document.getElementById('timezone-select');
+                const timezones = data.data.sort();
+                select.innerHTML = timezones.map(tz => 
+                    `<option value="${tz}" ${tz === currentTimezone ? 'selected' : ''}>${tz.replace(/_/g, ' ')}</option>`
+                ).join('');
+                getCurrentTime();
+            } catch (error) {
+                console.error('Error fetching timezones:', error);
+                const select = document.getElementById('timezone-select');
+                select.innerHTML = `<option value="${currentTimezone}">${currentTimezone}</option>`;
+                getCurrentTime();
+            }
+        }
+
+        async function getCurrentTime() {
+            const timezone = document.getElementById('timezone-select').value;
+            currentTimezone = timezone;
+            
+            try {
+                const response = await fetch(`/time/current?timezone=${encodeURIComponent(timezone)}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                const date = new Date(data.data.datetime);
+                document.getElementById('time').textContent = date.toLocaleTimeString();
+                document.getElementById('timezone').textContent = data.data.timezone;
+                document.getElementById('day').textContent = days[date.getDay()];
+                document.getElementById('offset').textContent = data.data.utc_offset;
+            } catch (error) {
+                console.error('Error fetching time:', error);
+                document.getElementById('time').textContent = 'Retrying...';
+                // Retry after 2 seconds
+                setTimeout(getCurrentTime, 2000);
+            }
+        }
+
+        // Initialize
+        getTimezones().catch(console.error);
+        
+        // Add event listeners
+        document.getElementById('timezone-select').addEventListener('change', getCurrentTime);
+        
+        // Update time every 5 seconds instead of every second to reduce load
+        const timeInterval = setInterval(getCurrentTime, 5000);
+        
+        // Cleanup interval on page unload
+        window.addEventListener('unload', () => clearInterval(timeInterval));
+    </script>
+</body>
+</html> 
